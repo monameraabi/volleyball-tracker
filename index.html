@@ -1,134 +1,423 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Volleyball Tracker</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; }
-    input, select, button { font-size: 16px; padding: 8px; margin: 4px 0; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f0f0f0; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volleyball Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #eef2f5;
+    --card: #ffffff;
+    --ink: #10243a;
+    --muted: #5d6f82;
+    --line: #d8e0e7;
+    --blue: #1f5fa8;
+    --orange: #f0622a;
+    --kill: #f0622a;
+    --ace: #1f5fa8;
+    --block: #10243a;
+    --dig: #178a7c;
+    --error: #b8323a;
+    --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    --body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--body); font-size: 16px; line-height: 1.5;
+  }
+  h1, h2, h3 { font-family: var(--display); line-height: 1; margin: 0; letter-spacing: .01em; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+  /* ---------- top bar ---------- */
+  .top {
+    background: var(--ink); color: #fff;
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .brand { font-family: var(--display); font-weight: 800; font-size: 26px; display: flex; align-items: center; gap: 8px; }
+  .who { font-size: 14px; color: #b9c7d6; display: flex; align-items: center; gap: 12px; }
+  .ghost {
+    background: transparent; border: 1px solid #4a6178; color: #fff;
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .ghost:hover { background: #1d3752; }
+
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 60px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .card h2 { font-size: 28px; margin-bottom: 14px; }
+
+  /* ---------- login ---------- */
+  #auth-box { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; padding: 28px 0; }
+  .hero h1 { font-size: clamp(46px, 9vw, 84px); font-weight: 800; }
+  .hero h1 span { color: var(--orange); }
+  .hero p { color: var(--muted); max-width: 34ch; margin: 14px 0 22px; }
+  .court {
+    position: relative; width: 100%; max-width: 260px; aspect-ratio: 2 / 1;
+    background: var(--blue); border: 3px solid #fff; outline: 2px solid var(--blue);
+  }
+  .court::before { content: ""; position: absolute; left: 50%; top: -8px; bottom: -8px; width: 4px; background: #fff; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--ink); }
+  .court::after { content: ""; position: absolute; inset: 0 33% 0 33%; border-left: 2px solid #fff; border-right: 2px solid #fff; }
+  .field { display: block; margin-bottom: 12px; font-size: 14px; font-weight: 500; }
+  .field input {
+    display: block; width: 100%; margin-top: 4px; padding: 11px 12px;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    border: 0; border-radius: 10px; padding: 11px 18px; font-weight: 700; cursor: pointer;
+    background: var(--orange); color: #fff;
+  }
+  .btn.alt { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn:hover { filter: brightness(.95); }
+  #msg { color: var(--error); font-size: 14px; min-height: 20px; margin: 10px 0 0; }
+
+  /* ---------- logging ---------- */
+  .log-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .log-grid .field { margin: 0; }
+  .stat-btns { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 16px; }
+  .stat-btn {
+    border: 0; border-radius: 12px; color: #fff; cursor: pointer;
+    padding: 16px 4px; font-family: var(--display); font-weight: 700; font-size: 22px;
+    transition: transform .08s ease;
+  }
+  .stat-btn:active { transform: scale(.94); }
+  .stat-btn small { display: block; font-family: var(--body); font-weight: 500; font-size: 12px; opacity: .85; }
+
+  /* ---------- table ---------- */
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .head-row h2 { margin: 0; }
+  .head-row select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; }
+  th { font-weight: 500; font-size: 14px; color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 2px solid var(--ink); }
+  td { padding: 12px 10px; text-align: right; font-family: var(--display); font-size: 24px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  td:first-child { font-family: var(--body); font-size: 16px; font-weight: 700; }
+  td.top-val { color: var(--orange); }
+  .empty { color: var(--muted); padding: 18px 0 4px; }
+
+  /* ---------- recent ---------- */
+  #recent { list-style: none; margin: 0; padding: 0; }
+  #recent li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  #recent li:last-child { border-bottom: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .what { flex: 1; }
+  .what span { color: var(--muted); font-size: 14px; }
+  .del { border: 0; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; border-radius: 8px; padding: 4px 10px; }
+  .del:hover { background: #fbe9ea; color: var(--error); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 640px) {
+    #auth-box { grid-template-columns: 1fr; }
+    .log-grid { grid-template-columns: 1fr; }
+    .stat-btns { grid-template-columns: repeat(3, 1fr); }
+    .who .email { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stat-btn, .toast { transition: none; }
+  }
+</style>
 </head>
 <body>
-  <h1>🏐 Volleyball Tracker</h1>
 
-  <!-- shown when logged out -->
-  <div id="auth-box">
-    <h2>Log in or sign up</h2>
-    <input id="email" type="email" placeholder="Email"><br>
-    <input id="password" type="password" placeholder="Password (6+ characters)"><br>
-    <button onclick="signUp()">Sign up</button>
-    <button onclick="logIn()">Log in</button>
-    <p id="msg"></p>
+<header class="top">
+  <div class="brand">🏐 Volleyball Tracker</div>
+  <div class="who" id="who-box" style="display:none">
+    <span class="email" id="who"></span>
+    <button class="ghost" onclick="logOut()">Log out</button>
   </div>
+</header>
 
-  <!-- shown when logged in -->
-  <div id="app-box" style="display:none">
-    <p>Logged in as <b id="who"></b> <button onclick="logOut()">Log out</button></p>
+<main>
+  <!-- logged out -->
+  <section id="auth-box">
+    <div class="hero">
+      <h1>Every kill.<br>Every <span>dig.</span></h1>
+      <p>Log stats during the match and see each player's totals the moment you stop.</p>
+      <div class="court" role="img" aria-label="Volleyball court"></div>
+    </div>
+    <div class="card" style="margin:0">
+      <h2>Log in or sign up</h2>
+      <label class="field">Email
+        <input id="email" type="email" autocomplete="email">
+      </label>
+      <label class="field">Password (6+ characters)
+        <input id="password" type="password" autocomplete="current-password">
+      </label>
+      <div class="row">
+        <button class="btn" onclick="logIn()">Log in</button>
+        <button class="btn alt" onclick="signUp()">Sign up</button>
+      </div>
+      <p id="msg"></p>
+    </div>
+  </section>
 
-    <input id="player" placeholder="Player name">
-    <select id="type">
-      <option value="kill">Kill</option>
-      <option value="ace">Ace</option>
-      <option value="block">Block</option>
-      <option value="dig">Dig</option>
-      <option value="error">Error</option>
-    </select>
-    <button onclick="addStat()">Add</button>
+  <!-- logged in -->
+  <section id="app-box" style="display:none">
+    <div class="card">
+      <h2>Log a stat</h2>
+      <div class="log-grid">
+        <label class="field">Match
+          <input id="match" value="Practice" list="match-list">
+          <datalist id="match-list"></datalist>
+        </label>
+        <label class="field">Player
+          <input id="player" placeholder="Type a name" list="player-list">
+          <datalist id="player-list"></datalist>
+        </label>
+      </div>
+      <div class="stat-btns" id="stat-btns"></div>
+    </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Player</th><th>Kills</th><th>Aces</th>
-          <th>Blocks</th><th>Digs</th><th>Errors</th>
-        </tr>
-      </thead>
-      <tbody id="body"></tbody>
-    </table>
-  </div>
+    <div class="card">
+      <div class="head-row">
+        <h2>Totals</h2>
+        <label>Show: <select id="filter" onchange="render()"></select></label>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th><th>Kills</th><th>Aces</th><th>Blocks</th><th>Digs</th><th>Errors</th>
+            </tr>
+          </thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="empty" style="display:none">No stats yet. Enter a player name above and tap a stat button.</p>
+    </div>
 
-  <script>
-    const db = supabase.createClient(
-      "https://rjcghbikjpmdslzubvnx.supabase.co",
-      "sb_publishable_aghLGh05CylAzcrxpiCD4w_ZRVg3N_z"
-    );
+    <div class="card">
+      <h2>Recent entries</h2>
+      <ul id="recent"></ul>
+    </div>
+  </section>
+</main>
 
-    const TYPES = ["kill", "ace", "block", "dig", "error"];
+<div class="toast" id="toast"></div>
 
-    // ---------- login stuff ----------
-    async function signUp() {
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-      const { error } = await db.auth.signUp({ email, password });
-      document.getElementById("msg").textContent = error
-        ? error.message
-        : "Account created! If you're not logged in automatically, press Log in.";
-    }
+<script>
+  const db = supabase.createClient(
+    "https://rjcghbikjpmdslzubvnx.supabase.co",
+    "sb_publishable_aghLGh05CylAzcrxpiCD4w_ZRVg3N_z"
+  );
 
-    async function logIn() {
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-      const { error } = await db.auth.signInWithPassword({ email, password });
-      if (error) document.getElementById("msg").textContent = error.message;
-    }
+  const TYPES = ["kill", "ace", "block", "dig", "error"];
+  const LABELS = { kill: "Kill", ace: "Ace", block: "Block", dig: "Dig", error: "Error" };
+  const COLORS = {
+    kill: "var(--kill)", ace: "var(--ace)", block: "var(--block)",
+    dig: "var(--dig)", error: "var(--error)"
+  };
+  let allRows = [];
 
-    async function logOut() {
-      await db.auth.signOut();
-    }
+  // ---------- little helpers ----------
+  const $ = id => document.getElementById(id);
 
-    // runs on page load AND every time someone logs in or out
-    db.auth.onAuthStateChange((event, session) => {
-      const loggedIn = !!session;
-      document.getElementById("auth-box").style.display = loggedIn ? "none" : "block";
-      document.getElementById("app-box").style.display = loggedIn ? "block" : "none";
-      if (loggedIn) {
-        document.getElementById("who").textContent = session.user.email;
-        setTimeout(loadStats, 0);
-      } else {
-        document.getElementById("body").innerHTML = "";
-      }
+  let toastTimer;
+  function toast(text) {
+    const t = $("toast");
+    t.textContent = text;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+  }
+
+  // build the five big stat buttons
+  for (const t of TYPES) {
+    const b = document.createElement("button");
+    b.className = "stat-btn";
+    b.style.background = COLORS[t];
+    b.textContent = LABELS[t];
+    const small = document.createElement("small");
+    small.textContent = "+1";
+    b.appendChild(small);
+    b.addEventListener("click", () => addStat(t));
+    $("stat-btns").appendChild(b);
+  }
+
+  // ---------- login stuff ----------
+  async function signUp() {
+    const { error } = await db.auth.signUp({
+      email: $("email").value.trim(),
+      password: $("password").value
     });
+    $("msg").textContent = error ? error.message : "Account created. If you aren't logged in automatically, press Log in.";
+  }
 
-    // ---------- stats stuff (same as before) ----------
-    async function loadStats() {
-      const { data, error } = await db.from("stats").select("player, type");
-      if (error) { console.error(error); return; }
+  async function logIn() {
+    const { error } = await db.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+    if (error) $("msg").textContent = error.message;
+  }
 
-      const totals = {};
-      for (const row of data) {
-        if (!totals[row.player]) {
-          totals[row.player] = { kill: 0, ace: 0, block: 0, dig: 0, error: 0 };
-        }
-        totals[row.player][row.type]++;
+  async function logOut() {
+    await db.auth.signOut();
+  }
+
+  db.auth.onAuthStateChange((event, session) => {
+    const loggedIn = !!session;
+    $("auth-box").style.display = loggedIn ? "none" : "grid";
+    $("app-box").style.display = loggedIn ? "block" : "none";
+    $("who-box").style.display = loggedIn ? "flex" : "none";
+    if (loggedIn) {
+      $("who").textContent = session.user.email;
+      setTimeout(loadStats, 0);
+    } else {
+      allRows = [];
+      $("body").innerHTML = "";
+      $("recent").innerHTML = "";
+    }
+  });
+
+  // ---------- data stuff ----------
+  async function loadStats() {
+    const { data, error } = await db
+      .from("stats")
+      .select("id, player, type, match, created_at")
+      .order("created_at", { ascending: false });
+    if (error) { console.error(error); toast("Couldn't load stats"); return; }
+    allRows = data;
+    render();
+  }
+
+  async function addStat(type) {
+    const player = $("player").value.trim();
+    const match = $("match").value.trim() || "Practice";
+    if (!player) { toast("Type a player name first"); $("player").focus(); return; }
+
+    const { error } = await db.from("stats").insert({ player, type, match });
+    if (error) { console.error(error); toast("Couldn't save that stat"); return; }
+    toast(player + ": " + LABELS[type] + " added");
+    loadStats();
+  }
+
+  async function deleteStat(id) {
+    const { error } = await db.from("stats").delete().eq("id", id);
+    if (error) { console.error(error); toast("Couldn't delete that entry"); return; }
+    toast("Entry deleted");
+    loadStats();
+  }
+
+  // ---------- drawing stuff ----------
+  function fillList(listEl, values) {
+    listEl.innerHTML = "";
+    for (const v of values) {
+      const o = document.createElement("option");
+      o.value = v;
+      listEl.appendChild(o);
+    }
+  }
+
+  function render() {
+    const filterEl = $("filter");
+    const chosen = filterEl.value || "__all__";
+
+    const matches = [...new Set(allRows.map(r => r.match))];
+    filterEl.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "__all__";
+    allOpt.textContent = "All matches";
+    filterEl.appendChild(allOpt);
+    for (const m of matches) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      filterEl.appendChild(opt);
+    }
+    filterEl.value = matches.includes(chosen) ? chosen : "__all__";
+
+    // autocomplete for the inputs
+    fillList($("match-list"), matches);
+    fillList($("player-list"), [...new Set(allRows.map(r => r.player))]);
+
+    const rows = filterEl.value === "__all__"
+      ? allRows
+      : allRows.filter(r => r.match === filterEl.value);
+
+    // totals
+    const totals = {};
+    for (const row of rows) {
+      if (!totals[row.player]) {
+        totals[row.player] = { kill: 0, ace: 0, block: 0, dig: 0, error: 0 };
       }
-
-      const body = document.getElementById("body");
-      body.innerHTML = "";
-      for (const name in totals) {
-        const tr = document.createElement("tr");
-        const nameCell = document.createElement("td");
-        nameCell.textContent = name;
-        tr.appendChild(nameCell);
-        for (const t of TYPES) {
-          const cell = document.createElement("td");
-          cell.textContent = totals[name][t];
-          tr.appendChild(cell);
-        }
-        body.appendChild(tr);
-      }
+      totals[row.player][row.type]++;
     }
 
-    async function addStat() {
-      const player = document.getElementById("player").value.trim();
-      const type = document.getElementById("type").value;
-      if (!player) { alert("Type a player name first"); return; }
-
-      const { error } = await db.from("stats").insert({ player, type });
-      if (error) { console.error(error); alert("Something went wrong"); return; }
-      loadStats();
+    // best value per column, so we can highlight the leader (errors excluded)
+    const best = {};
+    for (const t of TYPES) {
+      best[t] = Math.max(0, ...Object.values(totals).map(p => p[t]));
     }
-  </script>
+
+    const body = $("body");
+    body.innerHTML = "";
+    const names = Object.keys(totals).sort((a, b) => totals[b].kill - totals[a].kill);
+    for (const name of names) {
+      const tr = document.createElement("tr");
+      const nameCell = document.createElement("td");
+      nameCell.textContent = name;
+      tr.appendChild(nameCell);
+      for (const t of TYPES) {
+        const cell = document.createElement("td");
+        cell.textContent = totals[name][t];
+        if (t !== "error" && totals[name][t] > 0 && totals[name][t] === best[t]) {
+          cell.className = "top-val";
+        }
+        tr.appendChild(cell);
+      }
+      body.appendChild(tr);
+    }
+    $("empty").style.display = names.length ? "none" : "block";
+
+    // recent entries
+    const list = $("recent");
+    list.innerHTML = "";
+    for (const row of rows.slice(0, 10)) {
+      const li = document.createElement("li");
+
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = COLORS[row.type];
+
+      const what = document.createElement("span");
+      what.className = "what";
+      what.textContent = row.player + " · " + LABELS[row.type] + " ";
+      const sub = document.createElement("span");
+      sub.textContent = "(" + row.match + ")";
+      what.appendChild(sub);
+
+      const btn = document.createElement("button");
+      btn.className = "del";
+      btn.textContent = "✕";
+      btn.setAttribute("aria-label", "Delete this entry");
+      btn.addEventListener("click", () => deleteStat(row.id));
+
+      li.append(dot, what, btn);
+      list.appendChild(li);
+    }
+    if (!rows.length) {
+      const li = document.createElement("li");
+      li.textContent = "Nothing logged yet.";
+      li.style.color = "var(--muted)";
+      list.appendChild(li);
+    }
+  }
+</script>
 </body>
 </html>
