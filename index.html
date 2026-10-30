@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Volleyball Tracker</title>
+</head>
+<body>
+  <h1>🏐 Volleyball Tracker</h1>
+  <p>Kills: <span id="count">0</span></p>
+  <button onclick="addKill()">+1 Kill</button>
+
+  <script>
+    let kills = 0;
+    function addKill() {
+      kills = kills + 1;
+      document.getElementById("count").textContent = kills;
+    }
+  </script>
+</body>
+</html>
