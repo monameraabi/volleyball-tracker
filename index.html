@@ -2,18 +2,32 @@
 <html>
 <head>
   <title>Volleyball Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <h1>🏐 Volleyball Trackingg</h1>
-  <p>Kills: <span id="count">0</span></p>
+  <h1>🏐 Volleyball Tracker</h1>
+  <p>Kills: <span id="count">...</span></p>
   <button onclick="addKill()">+1 Kill</button>
 
   <script>
-    let kills = 0;
-    function addKill() {
-      kills = kills + 1;
-      document.getElementById("count").textContent = kills;
+    const db = supabase.createClient(
+      "https://rjcghbikjpmdslzubvnx.supabase.co",
+      "sb_publishable_aghLGh05CylAzcrxpiCD4w_ZRVg3N_z"
+    );
+
+    async function loadCount() {
+      const { count } = await db
+        .from("kills")
+        .select("*", { count: "exact", head: true });
+      document.getElementById("count").textContent = count;
     }
+
+    async function addKill() {
+      await db.from("kills").insert({ player: "Me" });
+      loadCount();
+    }
+
+    loadCount();
   </script>
 </body>
 </html>
