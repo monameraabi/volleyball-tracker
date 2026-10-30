@@ -14,25 +14,40 @@
 <body>
   <h1>🏐 Volleyball Tracker</h1>
 
-  <input id="player" placeholder="Player name">
-  <select id="type">
-    <option value="kill">Kill</option>
-    <option value="ace">Ace</option>
-    <option value="block">Block</option>
-    <option value="dig">Dig</option>
-    <option value="error">Error</option>
-  </select>
-  <button onclick="addStat()">Add</button>
+  <!-- shown when logged out -->
+  <div id="auth-box">
+    <h2>Log in or sign up</h2>
+    <input id="email" type="email" placeholder="Email"><br>
+    <input id="password" type="password" placeholder="Password (6+ characters)"><br>
+    <button onclick="signUp()">Sign up</button>
+    <button onclick="logIn()">Log in</button>
+    <p id="msg"></p>
+  </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Player</th><th>Kills</th><th>Aces</th>
-        <th>Blocks</th><th>Digs</th><th>Errors</th>
-      </tr>
-    </thead>
-    <tbody id="body"></tbody>
-  </table>
+  <!-- shown when logged in -->
+  <div id="app-box" style="display:none">
+    <p>Logged in as <b id="who"></b> <button onclick="logOut()">Log out</button></p>
+
+    <input id="player" placeholder="Player name">
+    <select id="type">
+      <option value="kill">Kill</option>
+      <option value="ace">Ace</option>
+      <option value="block">Block</option>
+      <option value="dig">Dig</option>
+      <option value="error">Error</option>
+    </select>
+    <button onclick="addStat()">Add</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th><th>Kills</th><th>Aces</th>
+          <th>Blocks</th><th>Digs</th><th>Errors</th>
+        </tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
 
   <script>
     const db = supabase.createClient(
@@ -42,11 +57,45 @@
 
     const TYPES = ["kill", "ace", "block", "dig", "error"];
 
+    // ---------- login stuff ----------
+    async function signUp() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const { error } = await db.auth.signUp({ email, password });
+      document.getElementById("msg").textContent = error
+        ? error.message
+        : "Account created! If you're not logged in automatically, press Log in.";
+    }
+
+    async function logIn() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) document.getElementById("msg").textContent = error.message;
+    }
+
+    async function logOut() {
+      await db.auth.signOut();
+    }
+
+    // runs on page load AND every time someone logs in or out
+    db.auth.onAuthStateChange((event, session) => {
+      const loggedIn = !!session;
+      document.getElementById("auth-box").style.display = loggedIn ? "none" : "block";
+      document.getElementById("app-box").style.display = loggedIn ? "block" : "none";
+      if (loggedIn) {
+        document.getElementById("who").textContent = session.user.email;
+        setTimeout(loadStats, 0);
+      } else {
+        document.getElementById("body").innerHTML = "";
+      }
+    });
+
+    // ---------- stats stuff (same as before) ----------
     async function loadStats() {
       const { data, error } = await db.from("stats").select("player, type");
       if (error) { console.error(error); return; }
 
-      // count each stat per player
       const totals = {};
       for (const row of data) {
         if (!totals[row.player]) {
@@ -55,7 +104,6 @@
         totals[row.player][row.type]++;
       }
 
-      // draw the table
       const body = document.getElementById("body");
       body.innerHTML = "";
       for (const name in totals) {
@@ -81,8 +129,6 @@
       if (error) { console.error(error); alert("Something went wrong"); return; }
       loadStats();
     }
-
-    loadStats();
   </script>
 </body>
 </html>
