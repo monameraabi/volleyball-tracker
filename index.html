@@ -91,12 +91,26 @@
   .stat-btn:active { transform: scale(.94); }
   .stat-btn small { display: block; font-family: var(--body); font-weight: 500; font-size: 12px; opacity: .85; }
 
+  /* ---------- summary + bars ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+  .tile b { display: block; font-family: var(--display); font-size: 38px; font-weight: 700; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile span { color: var(--muted); font-size: 14px; }
+  .bar-row { display: grid; grid-template-columns: 64px 1fr 36px; align-items: center; gap: 10px; margin: 9px 0; }
+  .bar-track { background: var(--bg); border-radius: 999px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width .3s ease; }
+  .bar-row .n { font-family: var(--display); font-size: 20px; font-weight: 600; text-align: right; }
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+  .tools .btn { padding: 8px 14px; font-size: 14px; }
+  .tip { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+
   /* ---------- table ---------- */
   .head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .head-row h2 { margin: 0; }
   .head-row select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
   .scroll { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; min-width: 480px; }
+  table { border-collapse: collapse; width: 100%; min-width: 540px; }
+  td.pts { color: var(--blue); }
   th { font-weight: 500; font-size: 14px; color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 2px solid var(--ink); }
   td { padding: 12px 10px; text-align: right; font-family: var(--display); font-size: 24px; font-weight: 600; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
@@ -125,10 +139,12 @@
     #auth-box { grid-template-columns: 1fr; }
     .log-grid { grid-template-columns: 1fr; }
     .stat-btns { grid-template-columns: repeat(3, 1fr); }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .tip { display: none; }
     .who .email { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .stat-btn, .toast { transition: none; }
+    .stat-btn, .toast, .bar-fill { transition: none; }
   }
 </style>
 </head>
@@ -181,6 +197,23 @@
         </label>
       </div>
       <div class="stat-btns" id="stat-btns"></div>
+      <div class="tools">
+        <button class="btn alt" onclick="undoLast()">↶ Undo last</button>
+        <button class="btn alt" onclick="exportCsv()">Download CSV</button>
+      </div>
+      <p class="tip">Tip: click on empty space, then press keys 1 to 5 to log Kill, Ace, Block, Dig, Error.</p>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><b id="t-points">0</b><span>Team points</span></div>
+      <div class="tile"><b id="t-errors">0</b><span>Team errors</span></div>
+      <div class="tile"><b id="t-leader">-</b><span>Top scorer</span></div>
+      <div class="tile"><b id="t-entries">0</b><span>Stats logged</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Team breakdown</h2>
+      <div id="bars"></div>
     </div>
 
     <div class="card">
@@ -192,7 +225,7 @@
         <table>
           <thead>
             <tr>
-              <th>Player</th><th>Kills</th><th>Aces</th><th>Blocks</th><th>Digs</th><th>Errors</th>
+              <th>Player</th><th>Kills</th><th>Aces</th><th>Blocks</th><th>Digs</th><th>Errors</th><th>Points</th>
             </tr>
           </thead>
           <tbody id="body"></tbody>
@@ -314,6 +347,40 @@
     loadStats();
   }
 
+  async function undoLast() {
+    if (!allRows.length) { toast("Nothing to undo"); return; }
+    await deleteStat(allRows[0].id); // allRows is newest-first
+  }
+
+  function exportCsv() {
+    if (!allRows.length) { toast("Nothing to export"); return; }
+    // quote every value; a leading = + - @ could run as a formula in Excel, so neutralize it
+    const esc = v => {
+      v = String(v);
+      if (/^[=+\-@]/.test(v)) v = "'" + v;
+      return '"' + v.replace(/"/g, '""') + '"';
+    };
+    const lines = ["match,player,stat,time"];
+    for (const r of allRows) {
+      lines.push([r.match, r.player, r.type, r.created_at].map(esc).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "volleyball-stats.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // keyboard shortcuts: 1-5 log a stat when you're not typing in a box
+  document.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+    if ($("app-box").style.display === "none") return;
+    const i = Number(e.key);
+    if (i >= 1 && i <= 5) addStat(TYPES[i - 1]);
+  });
+
   // ---------- drawing stuff ----------
   function fillList(listEl, values) {
     listEl.innerHTML = "";
@@ -367,7 +434,8 @@
 
     const body = $("body");
     body.innerHTML = "";
-    const names = Object.keys(totals).sort((a, b) => totals[b].kill - totals[a].kill);
+    const pointsOf = p => p.kill + p.ace + p.block;
+    const names = Object.keys(totals).sort((a, b) => pointsOf(totals[b]) - pointsOf(totals[a]));
     for (const name of names) {
       const tr = document.createElement("tr");
       const nameCell = document.createElement("td");
@@ -381,9 +449,43 @@
         }
         tr.appendChild(cell);
       }
+      const ptsCell = document.createElement("td");
+      ptsCell.className = "pts";
+      ptsCell.textContent = pointsOf(totals[name]);
+      tr.appendChild(ptsCell);
       body.appendChild(tr);
     }
     $("empty").style.display = names.length ? "none" : "block";
+
+    // team summary tiles + bars (points = kills + aces + blocks)
+    const sum = { kill: 0, ace: 0, block: 0, dig: 0, error: 0 };
+    for (const r of rows) sum[r.type]++;
+    $("t-points").textContent = pointsOf(sum);
+    $("t-errors").textContent = sum.error;
+    $("t-leader").textContent = names.length ? names[0] : "-";
+    $("t-entries").textContent = rows.length;
+
+    const max = Math.max(1, ...TYPES.map(t => sum[t]));
+    const bars = $("bars");
+    bars.innerHTML = "";
+    for (const t of TYPES) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "bar-row";
+      const label = document.createElement("span");
+      label.textContent = LABELS[t];
+      const track = document.createElement("div");
+      track.className = "bar-track";
+      const fill = document.createElement("div");
+      fill.className = "bar-fill";
+      fill.style.width = (sum[t] / max * 100) + "%";
+      fill.style.background = COLORS[t];
+      track.appendChild(fill);
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = sum[t];
+      rowEl.append(label, track, n);
+      bars.appendChild(rowEl);
+    }
 
     // recent entries
     const list = $("recent");
