@@ -3,11 +3,36 @@
 <head>
   <title>Volleyball Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; }
+    input, select, button { font-size: 16px; padding: 8px; margin: 4px 0; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f0f0f0; }
+  </style>
 </head>
 <body>
   <h1>🏐 Volleyball Tracker</h1>
-  <p>Kills: <span id="count">...</span></p>
-  <button onclick="addKill()">+1 Kill</button>
+
+  <input id="player" placeholder="Player name">
+  <select id="type">
+    <option value="kill">Kill</option>
+    <option value="ace">Ace</option>
+    <option value="block">Block</option>
+    <option value="dig">Dig</option>
+    <option value="error">Error</option>
+  </select>
+  <button onclick="addStat()">Add</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th><th>Kills</th><th>Aces</th>
+        <th>Blocks</th><th>Digs</th><th>Errors</th>
+      </tr>
+    </thead>
+    <tbody id="body"></tbody>
+  </table>
 
   <script>
     const db = supabase.createClient(
@@ -15,19 +40,49 @@
       "sb_publishable_aghLGh05CylAzcrxpiCD4w_ZRVg3N_z"
     );
 
-    async function loadCount() {
-      const { count } = await db
-        .from("kills")
-        .select("*", { count: "exact", head: true });
-      document.getElementById("count").textContent = count;
+    const TYPES = ["kill", "ace", "block", "dig", "error"];
+
+    async function loadStats() {
+      const { data, error } = await db.from("stats").select("player, type");
+      if (error) { console.error(error); return; }
+
+      // count each stat per player
+      const totals = {};
+      for (const row of data) {
+        if (!totals[row.player]) {
+          totals[row.player] = { kill: 0, ace: 0, block: 0, dig: 0, error: 0 };
+        }
+        totals[row.player][row.type]++;
+      }
+
+      // draw the table
+      const body = document.getElementById("body");
+      body.innerHTML = "";
+      for (const name in totals) {
+        const tr = document.createElement("tr");
+        const nameCell = document.createElement("td");
+        nameCell.textContent = name;
+        tr.appendChild(nameCell);
+        for (const t of TYPES) {
+          const cell = document.createElement("td");
+          cell.textContent = totals[name][t];
+          tr.appendChild(cell);
+        }
+        body.appendChild(tr);
+      }
     }
 
-    async function addKill() {
-      await db.from("kills").insert({ player: "Me" });
-      loadCount();
+    async function addStat() {
+      const player = document.getElementById("player").value.trim();
+      const type = document.getElementById("type").value;
+      if (!player) { alert("Type a player name first"); return; }
+
+      const { error } = await db.from("stats").insert({ player, type });
+      if (error) { console.error(error); alert("Something went wrong"); return; }
+      loadStats();
     }
 
-    loadCount();
+    loadStats();
   </script>
 </body>
 </html>
